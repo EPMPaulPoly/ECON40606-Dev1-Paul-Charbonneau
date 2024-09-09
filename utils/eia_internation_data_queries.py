@@ -41,8 +41,15 @@ class eia_api_PC():
             df.index = pd.to_datetime(df.index)
         return df
     
-    def get_data_by_id(self,productId:Union[str,list],unit:str =None):
-        base_query="https://api.eia.gov/v2/international/data/?frequency=annual&data[0]=value&facets[countryRegionTypeId][]=r&facets[countryRegionId][]=AFRC&facets[countryRegionId][]=ASOC&facets[countryRegionId][]=CSAM&facets[countryRegionId][]=EURA&facets[countryRegionId][]=EURO&facets[countryRegionId][]=MIDE&facets[countryRegionId][]=NOAM"
+    def get_data_by_id(self,productId:Union[str,list],unit:str =None,regions:Union[str,list] = ["AFRC","ASOC","CSAM","EURA","EURO","MIDE","NOAM"]):
+        base_query="https://api.eia.gov/v2/international/data/?frequency=annual&data[0]=value"
+
+        if isinstance(regions,list):
+            for region in regions:
+                base_query = f"{base_query}&facets[countryRegionId][]={region}"
+        elif isinstance(regions,str):
+            base_query = f"{base_query}&facets[countryRegionId][]={regions}"
+
         if isinstance(productId,list):
             for id in productId:
                 base_query = f"{base_query}&facets[productId][]={id}"
@@ -60,15 +67,17 @@ class eia_api_PC():
         data["period"] = data["period"].astype(int)
         return data
 
-def plot_by_region_and_type(data:pd.DataFrame,kind:str):
+def plot_by_region_and_type(data:pd.DataFrame,kind:str="line",region_dict:dict={"Africa":"Afrique","Asia & Oceania":"Asie et Océanie","Central & South America":"Amérique centrale et du Sud","Eurasia":"Eurasie","Europe":"Europe","Middle East":"Moyen-Orient","North America":"Amérique du Nord"}):
     array = np.array([[1,1,1],
                       [2,1,2],
                       [3,3,1],
                       [4,2,2],
-                      [5,3,2],
-                      [6,3,2]])
+                      [5,2,3],
+                      [6,2,3],
+                      [7,2,4],
+                      [8,2,4]])
     size_array = pd.DataFrame(array,columns=["n_products","plot_height","plot_width"])
-    regions = data["countryRegionId"].unique()
+    regions = data["countryRegionName"].unique()
     products = data["productName"].unique()
     n_products = len(products)
     fig = plt.figure()
@@ -77,13 +86,16 @@ def plot_by_region_and_type(data:pd.DataFrame,kind:str):
     legend = []
     for id,product in enumerate(products):
         ax = plt.subplot(plot_height,plot_width,id+1)
-        for region in regions:
-            data_to_plot = data.loc[(data["countryRegionId"] ==region) & (data["productName"]==product)] 
-            data_to_plot.plot(x="period",y="value",ax=ax,kind=kind)
-            legend.append(region)
-        ax.legend(legend)
+        data_to_plot:pd.DataFrame = data.loc[(data["productName"]==product)] 
+        data_to_plot = data_to_plot.sort_values(by=["countryRegionName","period"])
+        data_to_plot_pivot:pd.DataFrame = data_to_plot.pivot(index="period",columns="countryRegionName",values="value")
+        data_to_plot_pivot = data_to_plot_pivot.rename(columns=region_dict)
+        data_to_plot_pivot.plot(kind=kind,ax=ax)
         ax.set_xlabel(f"Year")
-        ax.set_ylabel(f"{product} - [{data_to_plot.loc[data_to_plot.index[0],"unitName"]}]")
+        ax.set_ylabel(f"{product} - [{data_to_plot.loc[data_to_plot.index[0],"unit"]}]")
+        ax.legend(loc="upper left",bbox_to_anchor=(0,1.5),ncols=4)
+        if id>0:
+            ax.get_legend().remove()
 
 if __name__=="__main__":
     api = eia_api_PC() 
