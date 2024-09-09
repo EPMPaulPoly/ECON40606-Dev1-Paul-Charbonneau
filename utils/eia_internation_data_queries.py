@@ -41,7 +41,7 @@ class eia_api_PC():
             df.index = pd.to_datetime(df.index)
         return df
     
-    def get_data_by_id(self,productId:Union[str,list],unit:str =None,regions:Union[str,list] = ["AFRC","ASOC","CSAM","EURA","EURO","MIDE","NOAM"]):
+    def get_data_by_id(self,productId:Union[str,list],unit:str =None,regions:Union[str,list] = ["AFRC","ASOC","CSAM","EURA","EURO","MIDE","NOAM"],activities:Union[str,list] = ["12","7","2","33","34","8"]):
         base_query="https://api.eia.gov/v2/international/data/?frequency=annual&data[0]=value"
 
         if isinstance(regions,list):
@@ -49,6 +49,12 @@ class eia_api_PC():
                 base_query = f"{base_query}&facets[countryRegionId][]={region}"
         elif isinstance(regions,str):
             base_query = f"{base_query}&facets[countryRegionId][]={regions}"
+        
+        if isinstance(activities,list):
+            for activity in activities:
+                base_query = f"{base_query}&facets[activityId][]={activity}"
+        elif isinstance(activities,str):
+            base_query = f"{base_query}&facets[activityId][]={activities}"
 
         if isinstance(productId,list):
             for id in productId:
@@ -63,6 +69,7 @@ class eia_api_PC():
         response = requests.get(query)
         json_response = response.json()
         data = pd.DataFrame(json_response["response"]["data"])
+        data = data.loc[data["dataFlagId"]!="2"]
         data["value"] = data["value"].astype(float)
         data["period"] = data["period"].astype(int)
         return data
@@ -75,7 +82,14 @@ def plot_by_region_and_type(data:pd.DataFrame,kind:str="line",region_dict:dict={
                       [5,2,3],
                       [6,2,3],
                       [7,2,4],
-                      [8,2,4]])
+                      [8,2,4],
+                      [9,2,5],
+                      [10,2,5],
+                      [11,3,4],
+                      [12,3,4],
+                      [13,3,5],
+                      [14,3,5],
+                      [15,3,5]])
     size_array = pd.DataFrame(array,columns=["n_products","plot_height","plot_width"])
     regions = data["countryRegionName"].unique()
     products = data["productName"].unique()
